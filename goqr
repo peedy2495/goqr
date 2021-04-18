@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# goqr Get OAuth QR-Code from Useraccount
+#
+# 
+
+ver=0.1
+deps=(qrencode)
+
+ARGS=$@
+
+main() {
+    while (( "$#" )); do
+      case "$1" in
+        -h|--help)
+          usage
+          exit 0
+          ;;
+        -v|--version)
+          echo $ver
+          exit 0
+          ;;
+        -*|--*=) # unsupported flags
+            echo "Error: Unsupported Option $1" >&2
+            usage
+            exit 1
+          ;;
+        *)
+            if [[ -z "$user" ]]; then
+                user=$1
+            else
+                echo "Too many Arguments!"
+                usage
+                exit 1
+            fi
+            shift
+          ;;
+        esac
+    done
+
+    check_cmd_deps
+    check_usr
+    get_homedir
+    check_file "$home/.google_authenticator"
+    secret=$(head -n1 "$home/.google_authenticator")
+    hostname=$(head -n1 /etc/hostname)
+    qrencode "otpauth://totp/$user%40$hostname?secret=$secret&issuer=$hostname" -t ANSIUTF8 -o -
+}
+
+check_cmd_deps(){
+  for dep in ${deps[@]}; do
+    if ! command -v $dep >/dev/null; then
+        echo "Missing command: $dep. Please install it first."
+        exit 1
+    fi
+  done
+}
+
+check_usr() {
+    if ! getent passwd $user  > /dev/null; then
+        echo "User doesn't exist: $user"
+        exit 1
+    fi
+}
+
+check_file() {
+    if [ ! -f $1 ]; then
+        echo "File not found! : $1"
+        exit 1
+    fi
+}
+
+get_homedir() {
+    home=$(getent passwd $user | cut -d':' -f 6)
+}
+
+usage() {
+    echo "Usage: goqr <username>
+Options:
+  -v, --version         show program's version number and exit
+  -h, --help            show this help message and exit"
+}
+main $ARGS
